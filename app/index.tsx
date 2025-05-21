@@ -1,21 +1,38 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ApiResponseInterface } from '@/interfaces/backend.response.interface';
+import ApiService from '@/services/api.service';
+
+const api = new ApiService();
 
 export default function Index() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([
-    { type: "user", text: "dois mais 2" },
-    { type: "bot", text: "4" },
-    { type: "user", text: "3 mais três" },
-    { type: "bot", text: "6" },
-  ]);
+  const [messages, setMessages] = useState<{ text: string, author: string }[]>([]);
+
+  const handleSend = async () => {
+    setMessages((prev) => [...prev, { text: input, author: 'user' }]);
+
+    setInput('');
+
+    try {
+      const response = await api.post<ApiResponseInterface>("http://192.168.0.9:8000/processar", { valor: input });
+      if (response) {
+        const data = response;
+        console.log(data);
+        setMessages((prev) => [...prev, { text: data.valor, author: 'bot' }]);
+      }
+    } catch (error) {
+      console.error(error);
+      setMessages((prev) => [...prev, { text: "Erro ao processar a expressão.", author: 'bot' }]);
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Ionicons name="calculator-outline" size={35} color="#fff" style={{marginRight: 90, textAlign:"center"}} />
+        <Ionicons name="calculator-outline" size={35} color="#fff" style={{ marginRight: 90, textAlign: "center" }} />
         <Text style={styles.headerText}>Calcula Aí</Text>
       </View>
 
@@ -26,7 +43,7 @@ export default function Index() {
             key={index}
             style={[
               styles.messageBubble,
-              msg.type === "user" ? styles.userBubble : styles.botBubble,
+              msg.author === 'user' ? styles.userBubble : styles.botBubble
             ]}
           >
             <Text style={styles.messageText}>{msg.text}</Text>
@@ -42,7 +59,7 @@ export default function Index() {
           value={input}
           onChangeText={setInput}
         />
-        <TouchableOpacity style={styles.sendButton}>
+        <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
           <Text style={{ color: "#fff", fontWeight: "bold" }}>Enviar</Text>
         </TouchableOpacity>
       </View>
