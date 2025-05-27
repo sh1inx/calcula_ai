@@ -1,0 +1,8 @@
+operacao,chaves,prompt,template
+soma,"somar,soma,mais","Por favor, informe os números que deseja somar, separados por vírgula.",'
+multiplicacao,"multiplicar,multiplicação,vezes","Por favor, informe os números que deseja multiplicar, separados por vírgula.",'
+subtracao,"subtrair,menos","Por favor, informe os números que deseja subtrair, separados por vírgula.",'
+divisao,"dividir,divisão","Por favor, informe os números que deseja dividir, separados por vírgula.",'
+porcentagem,"porcentagem,percentual,juros","Informe o valor base e a porcentagem, separados por vírgula.",
+media,"média,media","Informe os números para calcular a média, separados por vírgula.",
+juros_compostos,"juros compostos,juros acumulados","Informe o capital inicial, taxa de juros (%) e tempo (meses), separados por vírgula.",
