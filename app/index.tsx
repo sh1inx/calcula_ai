@@ -10,57 +10,69 @@ export default function Index() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<{ text: string, author: string }[]>([]);
 
-  const createJson = async (inputUsuario: string, respostaBot: string) => {
-    const chats = localStorage.getItem('chats');
-    console.log(chats);
-    const dataAtual = new Date();
-    const dataFormatada = dataAtual.toLocaleString('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    if (chats) {
-      const chatsArray = JSON.parse(chats);
-      const chatsExist = chatsArray.find((chats: { key: string }) => chats.key === dataFormatada);
-      console.log(chatsArray);
-      // if (chatsExist) {
-      //   const chatsArray = JSON.parse(chats);
-      //   chatsArray.push({ key: dataFormatada, chat: { input: inputUsuario, resposta: respostaBot } });
-      //   localStorage.setItem('chats', JSON.stringify(chatsArray));
-      // }
-    }else{
-      const json = {
-        key : dataFormatada, chat: {
-            input: inputUsuario,
-            resposta: respostaBot
-        }
-      }
-      localStorage.setItem('chats', JSON.stringify(json));
-    }
-  }
+  // const createJson = async (inputUsuario: string, respostaBot: string) => {
+  //   const chats = localStorage.getItem('chats');
+  //   console.log(chats);
+  //   const dataAtual = new Date();
+  //   const dataFormatada = dataAtual.toLocaleString('pt-BR', {
+  //     timeZone: 'America/Sao_Paulo',
+  //     year: 'numeric',
+  //     month: '2-digit',
+  //     day: '2-digit',
+  //     hour: '2-digit',
+  //     minute: '2-digit',
+  //     second: '2-digit'
+  //   });
+  //   if (chats) {
+  //     const chatsArray = JSON.parse(chats);
+  //     const chatsExist = chatsArray.find((chats: { key: string }) => chats.key === dataFormatada);
+  //     console.log(chatsArray);
+  //     // if (chatsExist) {
+  //     //   const chatsArray = JSON.parse(chats);
+  //     //   chatsArray.push({ key: dataFormatada, chat: { input: inputUsuario, resposta: respostaBot } });
+  //     //   localStorage.setItem('chats', JSON.stringify(chatsArray));
+  //     // }
+  //   }else{
+  //     const json = {
+  //       key : dataFormatada, chat: {
+  //           input: inputUsuario,
+  //           resposta: respostaBot
+  //       }
+  //     }
+  //     localStorage.setItem('chats', JSON.stringify(json));
+  //   }
+  // }
+
+  const [esperandoValores, setEsperandoValores] = useState(false);
 
   const handleSend = async () => {
-    setMessages((prev) => [...prev, { text: input, author: 'user' }]);
-
-    setInput('');
-
+    setMessages(prev => [...prev, { text: input, author: 'user' }]);
+  
     try {
-      const response = await api.post<ApiResponseInterface>("http://192.168.0.9:8000/processar", { valor: input });
-      if (response) {
-        const data = response;
-        setMessages((prev) => [...prev, { text: data.valor, author: 'bot' }]);
-        createJson(input, data.valor);
+      if (!esperandoValores) {
+        const dataToSend = { tipo: "pergunta", texto: input };
+        const response = await api.post<ApiResponseInterface>("http://127.0.0.1:8000/processar", dataToSend);
+        
+        setMessages(prev => [...prev, { text: response.resposta || response.valor, author: 'bot' }]);
+        
+        if ((response.resposta || "").toLowerCase().includes("por favor, informe os números")) {
+          setEsperandoValores(true);
+        }
+      } else {
+        const dataToSend = { tipo: "valores", texto: input };
+        const response = await api.post<ApiResponseInterface>("http://127.0.0.1:8000/processar", dataToSend);
+  
+        setMessages(prev => [...prev, { text: response.resposta || response.valor, author: 'bot' }]);
+        setEsperandoValores(false);
       }
+      setInput("");
     } catch (error) {
       console.error(error);
-      setMessages((prev) => [...prev, { text: "Erro ao processar a expressão.", author: 'bot' }]);
+      setMessages(prev => [...prev, { text: "Erro ao processar a expressão.", author: 'bot' }]);
+      setInput("");
     }
   };
-  
+    
   return (
     <View style={styles.container}>
       {/* Header */}

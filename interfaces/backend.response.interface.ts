@@ -5,4 +5,5 @@ export interface ApiResponseInterface {
   map: any;
   data: any;
   valor: string;
+  resposta: any;
 }
