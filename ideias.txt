@@ -1,0 +1,2 @@
+Aprendizado a partir da experiencia do usuario usando exemplos reais de contas matematicas, e de acordo com a resposta do usuario
+se foi um exemplo bom ou não, moldar os modelos de respostas
