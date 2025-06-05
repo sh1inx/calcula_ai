@@ -160,7 +160,7 @@ def gerar_numeros_pergunta(operacao: str, faixa_etaria: str, estado_sessao_atual
     else: range_max_base = 20
 
     range_max = int(range_max_base * fator_dificuldade_ml)
-    range_max = max(5, range_max) # Garantir um range mínimo
+    range_max = max(5, range_max)
     print(f"DEBUG: Range max base: {range_max_base}, Fator ML: {fator_dificuldade_ml}, Range max final: {range_max}")
 
     n1_min = 1
@@ -225,7 +225,7 @@ def gerar_numeros_pergunta(operacao: str, faixa_etaria: str, estado_sessao_atual
             n1 = n2_new * quociente
             if n1 != 0 : n2 = n2_new
 
-    n1=max(0,n1); n2=max(0,n2 if operacao != 'divisao' else (1 if n2==0 else n2) ) # Segurança final
+    n1=max(0,n1); n2=max(0,n2 if operacao != 'divisao' else (1 if n2==0 else n2) )
     return n1, n2
 
 def gerar_pergunta(operacao: str, faixa_etaria: str, estado_sessao_atual: dict) -> tuple[str | None, list[int] | None, int | None, str | None]:
