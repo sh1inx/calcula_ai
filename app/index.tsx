@@ -2,11 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
 import ApiService from '@/services/api.service';
-import { ApiResponseInterface } from "@/interfaces/backend.response.interface";
-
 
 const api = new ApiService();
-const API_ENDPOINT = "http://192.168.0.9:8000/aprender_matematica";
+const API_ENDPOINT = "http://192.168.0.9:8000/aprender_matematica"; 
 
 type EstadoConversa = 
   | "INICIAL"
@@ -25,6 +23,7 @@ interface AprendizadoApiResponseData {
   novo_exemplo_pratico?: string;
   proxima_acao_sugerida?: string;
   id_sessao_debug?: string; 
+  ml_fator_aplicado_debug?: number | string;
 }
 
 export default function Index() {
@@ -38,7 +37,7 @@ export default function Index() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    setMessages([{ text: "Olá! Bem-vindo ao Calcula Aí! Qual operação matemática você gostaria de aprender hoje? (Ex: soma, subtração, multiplicação, divisão)", author: 'bot' }]);
+    adicionarMensagemBot("Olá! Bem-vindo ao Calcula Aí! Qual operação matemática você gostaria de aprender hoje? (Ex: soma, subtração, multiplicação, divisão)");
     setEstadoConversa("PEDINDO_OPERACAO");
   }, []);
 
@@ -50,18 +49,26 @@ export default function Index() {
     setMessages(prev => [...prev, { text: texto, author: 'bot' }]);
   };
 
-  const resetarFluxoAprendizado = (mensagemErro?: string) => {
+  const resetarFluxoAprendizadoCompleto = (mensagemErro?: string) => {
     if (mensagemErro) {
         adicionarMensagemBot(mensagemErro);
     }
-    adicionarMensagemBot("Vamos tentar novamente. Qual operação matemática você gostaria de aprender? (Ex: soma, subtração)");
+    adicionarMensagemBot("Vamos tentar novamente do início. Qual operação matemática você gostaria de aprender? (Ex: soma, subtração)");
     setEstadoConversa("PEDINDO_OPERACAO");
     setOperacaoSelecionada(null);
-    setFaixaEtariaSelecionada(null);
+    setFaixaEtariaSelecionada(null); 
+  };
+
+  const resetarParaNovaOperacao = (mensagem?: string) => {
+    if (mensagem) {
+        adicionarMensagemBot(mensagem);
+    }
+    adicionarMensagemBot("Qual operação você gostaria de aprender agora?");
+    setEstadoConversa("PEDINDO_OPERACAO");
+    setOperacaoSelecionada(null);
   };
 
     const handleSend = async () => {
-    console.log("handleSend INÍCIO - Estado:", estadoConversa, "Input:", input);
     if (!input.trim()) return;
 
     const userInputText = input.trim();
@@ -72,120 +79,115 @@ export default function Index() {
     let dataParaEnviarNaRequisicao: any = null;
     let deveFazerChamadaAPI = true;
 
-
     try {
-
-        console.log("Antes do Switch - Estado:", estadoConversa, "userInputText:", userInputText);
         switch (estadoConversa) {
             case "PEDINDO_OPERACAO":
-                console.log("Switch: PEDINDO_OPERACAO");
-                const operacao = userInputText.toLowerCase();
+                const operacaoInput = userInputText.toLowerCase();
                 const operacoesValidas = ["soma", "subtração", "subtracao", "multiplicação", "multiplicacao", "divisão", "divisao"];
-                if (!operacoesValidas.includes(operacao)) {
+                if (!operacoesValidas.includes(operacaoInput)) {
                     adicionarMensagemBot("Operação inválida. Por favor, escolha entre: soma, subtração, multiplicação ou divisão.");
                     deveFazerChamadaAPI = false;
                 } else {
-                    setOperacaoSelecionada(operacao.replace("ç", "c").replace("ã", "a"));
-                    setEstadoConversa("PEDINDO_FAIXA_ETARIA");
-                    adicionarMensagemBot("Entendido! Agora, por favor, informe sua faixa etária (ex: 3-5, 6-8, 9-12).");
-                    deveFazerChamadaAPI = false;
+                    const operacaoNormalizada = operacaoInput.replace("ç", "c").replace("ã", "a");
+                    setOperacaoSelecionada(operacaoNormalizada);
+
+                    if (faixaEtariaSelecionada) { 
+                        dataParaEnviarNaRequisicao = {
+                            acao: "iniciar_aprendizado",
+                            operacao: operacaoNormalizada,
+                            faixa_etaria: faixaEtariaSelecionada, 
+                        };
+                    } else { 
+                        setEstadoConversa("PEDINDO_FAIXA_ETARIA");
+                        adicionarMensagemBot(`Entendido, vamos aprender sobre ${operacaoNormalizada}! Agora, por favor, informe sua idade (ex: 7).`);
+                        deveFazerChamadaAPI = false; 
+                    }
                 }
                 break;
 
             case "PEDINDO_FAIXA_ETARIA":
-                console.log("Switch: PEDINDO_FAIXA_ETARIA");
                 const idadeInput = userInputText.trim();
                 let faixaEtariaParaAPI = "";
 
                 if (!/^\d+$/.test(idadeInput)) {
                     adicionarMensagemBot("Por favor, informe sua idade como um número (ex: 7).");
                     deveFazerChamadaAPI = false;
-                    break;
-                }
-
-                const idade = parseInt(idadeInput, 10);
-
-                if (idade >= 3 && idade <= 5) {
-                    faixaEtariaParaAPI = "3-5";
-                } else if (idade >= 6 && idade <= 8) {
-                    faixaEtariaParaAPI = "6-8";
-                } else if (idade >= 9 && idade <= 12) {
-                    faixaEtariaParaAPI = "9-12";
                 } else {
-                    adicionarMensagemBot("Desculpe, no momento só temos conteúdo para idades entre 3 e 12 anos.");
-                    deveFazerChamadaAPI = false;
-                    break;
-                }
+                    const idade = parseInt(idadeInput, 10);
 
-                setFaixaEtariaSelecionada(faixaEtariaParaAPI);
-                dataParaEnviarNaRequisicao = {
-                    acao: "iniciar_aprendizado",
-                    operacao: operacaoSelecionada,
-                    faixa_etaria: faixaEtariaParaAPI,
-                };
-                console.log("PEDINDO_FAIXA_ETARIA - dataParaEnviar:", dataParaEnviarNaRequisicao);
+                    if (idade >= 3 && idade <= 5) faixaEtariaParaAPI = "3-5";
+                    else if (idade >= 6 && idade <= 8) faixaEtariaParaAPI = "6-8";
+                    else if (idade >= 9 && idade <= 12) faixaEtariaParaAPI = "9-12";
+                    else if (idade >= 13 && idade <= 15) faixaEtariaParaAPI = "13-15";
+                    else if (idade >= 16 && idade <= 18) faixaEtariaParaAPI = "16-18";
+                    else if (idade >= 19 && idade <= 22) faixaEtariaParaAPI = "19-22";
+                    else if (idade >= 23 && idade <= 25) faixaEtariaParaAPI = "23-25";
+                    else {
+                        adicionarMensagemBot("Desculpe, no momento só temos conteúdo para idades entre 3 e 25 anos. Vamos tentar de novo com uma idade válida?");
+                        deveFazerChamadaAPI = false;
+                    }
+
+                    if (deveFazerChamadaAPI) {
+                        setFaixaEtariaSelecionada(faixaEtariaParaAPI); 
+                        dataParaEnviarNaRequisicao = {
+                            acao: "iniciar_aprendizado",
+                            operacao: operacaoSelecionada, 
+                            faixa_etaria: faixaEtariaParaAPI,
+                        };
+                    }
+                }
                 break; 
 
             case "AGUARDANDO_RESPOSTA_PERGUNTA":
-                console.log("Switch: AGUARDANDO_RESPOSTA_PERGUNTA");
                 dataParaEnviarNaRequisicao = {
                     acao: "enviar_resposta",
-                    resposta_aluno: userInputText
+                    resposta_aluno: userInputText,
                 };
-                console.log("AGUARDANDO_RESPOSTA_PERGUNTA - dataParaEnviar:", dataParaEnviarNaRequisicao);
                 break; 
 
             case "AGUARDANDO_FEEDBACK_EXEMPLO":
-                console.log("Switch: AGUARDANDO_FEEDBACK_EXEMPLO");
                 const feedbackEntendeu = userInputText.toLowerCase() === 'sim' || userInputText.toLowerCase() === 'true';
                 dataParaEnviarNaRequisicao = {
                     acao: "enviar_feedback_exemplo",
                     feedback_entendeu: feedbackEntendeu
                 };
-                console.log("AGUARDANDO_FEEDBACK_EXEMPLO - dataParaEnviar:", dataParaEnviarNaRequisicao);
                 break;
             
             default:
-                console.log("Switch: DEFAULT");
-                resetarFluxoAprendizado("Estado de conversa desconhecido.");
+                resetarFluxoAprendizadoCompleto("Estado de conversa desconhecido. Vamos recomeçar.");
                 deveFazerChamadaAPI = false;
         }
 
-        console.log("Após Switch - deveFazerChamadaAPI:", deveFazerChamadaAPI, "dataParaEnviarNaRequisicao:", dataParaEnviarNaRequisicao);
-
-        if (deveFazerChamadaAPI) {
-            if (!dataParaEnviarNaRequisicao || Object.keys(dataParaEnviarNaRequisicao).length === 0) {
-                console.error("Tentativa de chamada API sem dados definidos ou com dados nulos!", estadoConversa, dataParaEnviarNaRequisicao);
-                resetarFluxoAprendizado("Erro interno: dados para API não foram preparados.");
-                return;
-            }
-
-            console.log("Enviando para API:", dataParaEnviarNaRequisicao);
+        if (deveFazerChamadaAPI && dataParaEnviarNaRequisicao) { 
             const respostaDoBackend = await api.post<AprendizadoApiResponseData>(API_ENDPOINT, dataParaEnviarNaRequisicao);
-            
-            console.log("==========================================");
-            console.log("Resposta do Backend (JSON direto):", JSON.stringify(respostaDoBackend, null, 2));
-            console.log("==========================================");
-
             const aprendizadoData: AprendizadoApiResponseData | null = respostaDoBackend;
 
+            if (aprendizadoData?.ml_fator_aplicado_debug) {
+                console.log("ML Fator Aplicado (Debug):", aprendizadoData.ml_fator_aplicado_debug);
+            }
+
             if (!aprendizadoData) {
-                resetarFluxoAprendizado("Não recebi uma resposta estruturada do servidor.");
+                resetarFluxoAprendizadoCompleto("Não recebi uma resposta estruturada do servidor.");
                 return;
             }
 
             if (aprendizadoData.erro) {
-                adicionarMensagemBot(aprendizadoData.erro);
+                adicionarMensagemBot(`Erro do servidor: ${aprendizadoData.erro}`);
+                if (dataParaEnviarNaRequisicao.acao === "iniciar_aprendizado") {
+                     resetarFluxoAprendizadoCompleto(); 
+                } else {
+                    resetarParaNovaOperacao("Houve um problema. Que tal tentarmos uma nova operação?");
+                }
                 return; 
             }
             
             if (dataParaEnviarNaRequisicao.acao === "iniciar_aprendizado") {
                  if (aprendizadoData.pergunta) {
-                    adicionarMensagemBot(aprendizadoData.mensagem || `Vamos praticar ${dataParaEnviarNaRequisicao.operacao}!`);
+                    if (aprendizadoData.mensagem) adicionarMensagemBot(aprendizadoData.mensagem);
                     adicionarMensagemBot(aprendizadoData.pergunta);
                     setEstadoConversa("AGUARDANDO_RESPOSTA_PERGUNTA");
                 } else {
-                    resetarFluxoAprendizado("Não consegui carregar a pergunta a partir dos dados recebidos.");
+                    resetarFluxoAprendizadoCompleto("Não consegui carregar a pergunta. Vamos tentar de novo.");
                 }
             } else if (dataParaEnviarNaRequisicao.acao === "enviar_resposta") {
                 if (aprendizadoData.feedback_resposta && aprendizadoData.exemplo_pratico && aprendizadoData.pergunta_feedback) {
@@ -194,7 +196,7 @@ export default function Index() {
                     adicionarMensagemBot(aprendizadoData.pergunta_feedback);
                     setEstadoConversa("AGUARDANDO_FEEDBACK_EXEMPLO");
                 } else {
-                    resetarFluxoAprendizado("Não recebi um feedback completo a partir dos dados recebidos.");
+                     resetarParaNovaOperacao("Não recebi um feedback completo. Vamos tentar outra operação?");
                 }
             } else if (dataParaEnviarNaRequisicao.acao === "enviar_feedback_exemplo") {
                  if (aprendizadoData.mensagem) adicionarMensagemBot(aprendizadoData.mensagem);
@@ -204,27 +206,22 @@ export default function Index() {
                     if (aprendizadoData.pergunta_feedback) {
                         adicionarMensagemBot(aprendizadoData.pergunta_feedback);
                     } else {
-                        resetarFluxoAprendizado("Vamos tentar uma nova pergunta sobre outro tema.");
+                        resetarParaNovaOperacao("Algo inesperado ocorreu com o exemplo. Vamos tentar uma nova operação?");
                     }
                 } else { 
                     if (aprendizadoData.proxima_acao_sugerida === "iniciar_aprendizado") {
-                        adicionarMensagemBot("Qual operação você gostaria de aprender agora?");
-                        setEstadoConversa("PEDINDO_OPERACAO");
-                        setOperacaoSelecionada(null);
-                        setFaixaEtariaSelecionada(null);
-                    } else if (!dataParaEnviarNaRequisicao.feedback_entendeu && !aprendizadoData.novo_exemplo_pratico) {
-                        adicionarMensagemBot("Gostaria de tentar outra operação ou uma nova pergunta sobre o mesmo tópico?");
-                        setEstadoConversa("PEDINDO_OPERACAO");
-                        setOperacaoSelecionada(null);
-                        setFaixaEtariaSelecionada(null);
-                    } else if (dataParaEnviarNaRequisicao.feedback_entendeu && !aprendizadoData.novo_exemplo_pratico) {
-                        adicionarMensagemBot("Ótimo! Qual operação você gostaria de aprender agora?");
-                        setEstadoConversa("PEDINDO_OPERACAO");
-                        setOperacaoSelecionada(null);
-                        setFaixaEtariaSelecionada(null);
+                        resetarParaNovaOperacao(); 
+                    } else {
+                        if (!aprendizadoData.mensagem) {
+                             adicionarMensagemBot("Concluímos por aqui. Se quiser, pode escolher uma nova operação!");
+                        }
+                        resetarParaNovaOperacao(); 
                     }
                 }
             }
+        } else if (deveFazerChamadaAPI && !dataParaEnviarNaRequisicao) {
+            console.error("Erro interno: dados para API deveriam ter sido preparados mas não foram.", estadoConversa, dataParaEnviarNaRequisicao);
+            resetarFluxoAprendizadoCompleto("Ocorreu um erro interno ao preparar os dados.");
         }
     } catch (error: any) {
         console.error("Erro na chamada da API:", error);
@@ -234,22 +231,22 @@ export default function Index() {
         } else if (error.message) {
             errorMessage = error.message;
         }
-        resetarFluxoAprendizado(errorMessage);
+        resetarFluxoAprendizadoCompleto(errorMessage);
     }
 };
     
   const getPlaceholder = () => {
     switch (estadoConversa) {
       case "PEDINDO_OPERACAO":
-        return "Digite a operação (soma, subtração, ...):";
+        return "Digite a operação (soma, subtração, ...)";
       case "PEDINDO_FAIXA_ETARIA":
-        return "Qual sua faixa etária (Ex: 3-5, 6-8, 9-12)?";
+        return "Qual sua idade (ex: 7)?"; 
       case "AGUARDANDO_RESPOSTA_PERGUNTA":
         return "Digite sua resposta numérica aqui:";
       case "AGUARDANDO_FEEDBACK_EXEMPLO":
         return "Entendeu o exemplo? (sim/não):";
       default:
-        return "Digite sua mensagem:";
+        return "Digite sua mensagem...";
     }
   };
 
@@ -263,7 +260,7 @@ export default function Index() {
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0} 
       >
         <ScrollView 
           ref={scrollViewRef}
@@ -294,6 +291,11 @@ export default function Index() {
             onChangeText={setInput}
             onSubmitEditing={handleSend}
             blurOnSubmit={false} 
+            keyboardType={
+                estadoConversa === "PEDINDO_FAIXA_ETARIA" || estadoConversa === "AGUARDANDO_RESPOSTA_PERGUNTA" 
+                ? "numeric" 
+                : "default"
+            }
           />
           <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
             <Ionicons name="send-outline" size={24} color="#fff" />
@@ -308,7 +310,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0F0F0" }, 
   header: {
     backgroundColor: "#F27C29",
-    paddingTop: 50, 
+    paddingTop: Platform.OS === 'ios' ? 50 : 30, 
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: "row",
@@ -353,12 +355,13 @@ const styles = StyleSheet.create({
   },
   inputArea: {
     flexDirection: "row",
-    padding: 15, 
+    paddingHorizontal: 15, 
+    paddingVertical: 10, 
     borderTopWidth: 1,
     borderColor: "#ddd",
     backgroundColor: '#fff', 
     alignItems: "center",
-    paddingBottom: 25, 
+    paddingBottom: Platform.OS === 'ios' ? 25 : 10, 
   },
   textInput: {
     flex: 1,
